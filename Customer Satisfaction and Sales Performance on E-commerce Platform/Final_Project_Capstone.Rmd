@@ -1,0 +1,111 @@
+---
+title: "Final_Project_Capstone"
+output: html_document
+date: "2024-06-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+# Loading libraries and essential datasets
+
+library(tidyverse)
+library(dplyr)
+#install.packages("ggpubr")
+library("ggpubr")
+library(sqldf)
+order_items <- read_csv("/Users/thuyvu/Desktop/CS Capstone - Final Project/archive/olist_order_items_dataset.csv")
+
+order_reviews <- read_csv("/Users/thuyvu/Desktop/CS Capstone - Final Project/archive/olist_order_reviews_dataset.csv")
+
+sqldf("select distinct review_score from order_reviews")
+```
+
+```{r}
+# Manipulating and cleaning the data
+# Preparation for data analysis
+order_items <- order_items %>%
+  select(order_id, product_id)
+
+
+order_reviews <- order_reviews %>%
+ select(order_id, review_score)
+
+product_sales <- order_items %>%
+  select(product_id) %>%
+  group_by(product_id) %>%
+  summarise(total_sales = n())
+
+product_review_score <- inner_join(order_reviews, order_items, by = "order_id") %>%
+  select(product_id, review_score) %>%
+  group_by(product_id) %>%
+  summarise(average_rating = mean(review_score))
+
+# view(product_sales)
+summary(product_sales)
+# view(product_review_score)
+summary(product_review_score)
+
+final_table <- inner_join(product_sales, product_review_score, by = "product_id") %>%
+  na.omit(final_table)
+```
+
+```{r}
+summary(final_table)
+head(final_table, 6)
+```
+
+```{r}
+# Visualizing the data
+ggscatter(final_table, x = "average_rating", y = "total_sales", 
+          add = "reg.line", conf.int = TRUE, 
+          cor.coef = TRUE, cor.method = "pearson",
+          cor.coef.size = 5,
+          xlab = "Average Rating Score", ylab = "Total Sales (Count)", ggtheme = theme_bw()) + theme(text = element_text(face = "bold", size = 14), axis.text=element_text(size=14))
+
+#ggsave("figure_1.png", width = 6.5, height = 5.2, units = "in", path = "/Users/thuyvu/Desktop/CS Capstone - Final Project/figures")
+# From the plot below, the relationship does not look very linear
+```
+```{r}
+# Skip this step due to large dataset
+# Shapiro-Wilk normality test for Average Rating Score
+# shapiro.test(final_table$average_rating)
+# Shapiro-Wilk normality test for Total Sales
+# shapiro.test(final_table$total_sales)
+```
+
+```{r}
+# Q-Q plot 
+# average_rating
+ggqqplot(final_table$average_rating, ylab = "Average Rating") + theme_bw() + theme(text = element_text(face = "bold", size = 14), axis.text=element_text(size=14))
+
+#ggsave("figure_2.png", width = 6.5, height = 5.2, units = "in", path = "/Users/thuyvu/Desktop/CS Capstone - Final Project/figures")
+# total_sales
+ggqqplot(final_table$total_sales, ylab = "Total Sales") + theme_bw() + theme(text = element_text(face = "bold", size = 14), axis.text=element_text(size=14))
+
+#ggsave("figure_3.png", width = 6.5, height = 5.2, units = "in", path = "/Users/thuyvu/Desktop/CS Capstone - Final Project/figures")
+# Looking at both plots, we can conclude that both populations may not come from normal distributions.Therefore, we will use Spearman and Kendall rank-based correlation tests, instead of Pearson.
+```
+
+```{r}
+# Spearman correlation test
+result <- cor.test(final_table$average_rating, final_table$total_sales, method = "spearman")
+result
+```
+
+```{r}
+# Kendall correlation test
+result2 <- cor.test(final_table$average_rating, final_table$total_sales, method = "kendall")
+result2
+```
+
+```{r}
+plot(final_table$average_rating, final_table$total_sales)
+final_table.regression <- lm(final_table$total_sales ~ final_table$average_rating, data = final_table)
+summary(final_table.regression)
+```
+
